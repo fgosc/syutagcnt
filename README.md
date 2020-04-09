@@ -46,7 +46,7 @@ https://www.python.org/
 を実行
 
 ウェブブラウザが開いて下記の画面がでるので「連携アプリを認証」を選択
- 
+![syutagcnt1](https://user-images.githubusercontent.com/62515228/78854315-f50b6a00-7a5b-11ea-9a64-12f57a41274a.png) 
 
 すると下記のようなPINコードがでるのでこの数字をコピペして
  
