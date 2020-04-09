@@ -49,7 +49,7 @@ https://www.python.org/
 ![syutagcnt1](https://user-images.githubusercontent.com/62515228/78854315-f50b6a00-7a5b-11ea-9a64-12f57a41274a.png) 
 
 すると下記のようなPINコードがでるのでこの数字をコピペして
- 
+![syutagcnt2](https://user-images.githubusercontent.com/62515228/78854461-59c6c480-7a5c-11ea-8448-9906c484a7ce.png) 
 
     次のURLをウェブブラウザで開きます: https://api.twitter.com/oauth/authorize?oauth_token=***********************************
     oauth_token: *************************************
