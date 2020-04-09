@@ -22,7 +22,7 @@ Twitter とYahoo!リアルタイム検索から7から10日前までの #FGO周�
 3. ファイルのコピー
 4. Twitter 認証
 5. ~~使用するChromeのバージョンに応じたSeernium のWebDriverのインストール~~
-
+***
 1. Python のインストール
 https://www.python.org/
 からPython をダウンロードしてインストール
