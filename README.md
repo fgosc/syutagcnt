@@ -15,13 +15,15 @@ Twitter とYahoo!リアルタイム検索から7から10日前までの #FGO周�
 * syurenquest.csv 修練場の定義ファイル
 * item.csv アイテム(素材)の定義ファイル
 * quest.csv クエスト名の変換ファイル
+* setting-dst.ini setting.ini を作成するための元ファイル
 
 # インストール
 1. Python のインストール
 2. Pythonパッケージ一括インストール
 3. ファイルのコピー
-4. Twitter 認証
-5. ~~使用するChromeのバージョンに応じたSeernium のWebDriverのインストール~~
+4. setting.ini の作成
+5. Twitter 認証
+6. ~~使用するChromeのバージョンに応じたSeernium のWebDriverのインストール~~
 ***
 1. Python のインストール
 https://www.python.org/
@@ -32,7 +34,7 @@ https://www.python.org/
 `$ pip install -r requirements.txt`  
 を実行 (pip はPyrhon に含まれるコマンド)
 
-3.	ファイルのコピー
+3. ファイルのコピー
 以下のファイルを使用するフォルダにコピーする。
 *	syutagcnt.py
 *	freequest.csv
@@ -40,7 +42,13 @@ https://www.python.org/
 *	item.csv
 *	quest.csv
 
-4.	Twitter 認証  
+4. setting.ini の作成  
+setting-dst.ini を setting.ini という名前でコピーする
+例: `$ copy setting-dst.ini setting.ini`
+
+https://developer.twitter.com/ からアプリケーション登録をしてconsumer_keyとconsumer_secretを手に入れた consumer_keyとconsumer_secretを setting.ini の該当箇所に記述する。ここでaccess_token と access_secret も手に入れて記述しておくと 5.の手順はとばせる
+
+5. Twitter 認証  
 コマンドプロンプトから  
 `$ python syutagcnt.py`  
 を実行
@@ -61,7 +69,7 @@ https://www.python.org/
 
 とでれば準備完了
 
-~~5.	使用するブラウザに応じたSeernium のWebDriverのインストール~~
+~~6.	使用するブラウザに応じたSeernium のWebDriverのインストール~~
 ~~まず、 http://chromedriver.chromium.org/downloads より、今使用しているChrome のバージョンに合わせたファイル(Windowsの場合はchromedriver_win32.zip)をダウンロードする.。~~
 ~~ダウンロードしたファイルを展開し、chromedriver.exeをyahoocnt.py のあるフォルダ(またはPATHの通ったフォルダ)に入れる。~~
  
