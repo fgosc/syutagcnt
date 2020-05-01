@@ -585,6 +585,8 @@ class SyukaiReport:
             return True            
             
         for item in item_dict.keys():
+            if item_dict[item] == "NaN":
+                return True
             if item in sozai.keys():
                 if sozai[item] == "金":
                     if item_dict[item] > num:
