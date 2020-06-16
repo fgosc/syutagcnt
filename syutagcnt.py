@@ -343,6 +343,7 @@ class SyukaiReport:
         self.items = {}
         s = unicodedata.normalize("NFKC", s)
         s = s.replace(",", "") #4桁の場合 "," をいれる人がいるので
+        s = s.replace("×", "x") #x をバツと書く人問題に対処
         # 1行1アイテムに分割
         # chr(8211) : enダッシュ
         # chr(8711) : Minus Sign
@@ -390,7 +391,18 @@ class SyukaiReport:
                         self.memo.append("アイテム名のみの記述")
                     continue
                 continue
-            tmpitem = normalize_item(re.sub(pattern, r"\g<name>", item).strip())
+            # 括弧つきのものは分離する 変換は括弧外のみで
+            pattern_kakko = "(?P<name_k>^.*\D)(?P<kakko>\(.+?\)$)"
+            item_k = re.sub(pattern, r"\g<name>", item).strip()
+            m_kakko = re.search(pattern_kakko, item_k)
+            if not m_kakko:
+                tmpitem = normalize_item(item_k)
+            else:
+                tmpitem1 = normalize_item(re.sub(pattern_kakko, r"\g<name_k>", item_k).strip())
+                tmpitem2 = re.sub(pattern_kakko, r"\g<kakko>", item_k)
+                tmpitem = tmpitem1 + tmpitem2                
+            
+##            tmpitem = normalize_item(re.sub(pattern, r"\g<name>", item).strip())
             #業火は例外にする
             if noclass == True:
                 exlist = []
