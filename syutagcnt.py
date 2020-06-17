@@ -344,6 +344,7 @@ class SyukaiReport:
         s = unicodedata.normalize("NFKC", s)
         s = s.replace(",", "") #4桁の場合 "," をいれる人がいるので
         s = s.replace("×", "x") #x をバツと書く人問題に対処
+        s = s.replace("QP(x", "QP(+") #QPの表記ぶれを修正 #7
         # 1行1アイテムに分割
         # chr(8211) : enダッシュ
         # chr(8711) : Minus Sign
@@ -400,9 +401,13 @@ class SyukaiReport:
             else:
                 tmpitem1 = normalize_item(re.sub(pattern_kakko, r"\g<name_k>", item_k).strip())
                 tmpitem2 = re.sub(pattern_kakko, r"\g<kakko>", item_k)
+                # 以下、QPの表記ぶれを修正 #7
+                tmpitem2 = tmpitem2.replace("百", "00") 
+                tmpitem2 = tmpitem2.replace("千", "000")
+                tmpitem2 = tmpitem2.replace("k", "000")                 
+                tmpitem2 = tmpitem2.replace("万", "0000")
                 tmpitem = tmpitem1 + tmpitem2                
             
-##            tmpitem = normalize_item(re.sub(pattern, r"\g<name>", item).strip())
             #業火は例外にする
             if noclass == True:
                 exlist = []
