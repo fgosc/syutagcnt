@@ -310,8 +310,8 @@ class SyukaiReport:
 ##                self.category = "Error"
                 self.memo.append("周回数が整数でない")
             elif int(num) < 1:
-##                num = None            
-##                self.category = "Error"
+                num = None
+                self.category = "Error"
                 self.memo.append("周回数が1以下")
             else:
                 num = int(num)
