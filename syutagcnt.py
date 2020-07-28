@@ -471,7 +471,7 @@ class SyukaiReport:
 
         if place in quest.keys():
             place = re.sub("^" + place + "$", quest[place], place)
-        self.place = place
+        self.place = place.replace("(","（").replace(")", "）")
             
         tmpplace = place.replace('(', ' ')
         tmpplace = tmpplace.replace(')', ' ')
