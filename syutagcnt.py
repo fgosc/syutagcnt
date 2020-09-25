@@ -290,6 +290,7 @@ class SyukaiReport:
         #周回数
         num_str = re.sub(pattern, r"\g<num>", m.group())
         num_str = num_str.replace(",", "") #カンマは除く
+        num_str = unicodedata.normalize("NFKC", num_str)
         if not num_str.isdecimal(): #数字じゃないとき
             self.desc = None
             self.num = None
