@@ -21,13 +21,17 @@ import tweepy
 import xlsxwriter
 import argparse
 import datetime
-import selenium
+import asyncio
+from datetime import datetime as dt
+
+from pyppeteer import launch
+# import selenium
 from tqdm import tqdm
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions
+# from selenium import webdriver
+# from selenium.webdriver.common.keys import Keys
+# from selenium.webdriver.common.by import By
+# from selenium.webdriver.support.ui import WebDriverWait
+# from selenium.webdriver.support import expected_conditions
 from operator import attrgetter
 import codecs
 
@@ -749,7 +753,7 @@ class YahooTweets:
             if use_yahoo:
                 old_time = id2time(since_id)                    
                 #データを取得
-                self.__get_yahoo_reports(old_time, sleep_time)
+                asyncio.get_event_loop().run_until_complete(self.__get_yahoo_reports(old_time, sleep_time))
                 #差分データを作成        
                 self.__make_diff(reports, history)
                 #データを結合
@@ -757,112 +761,78 @@ class YahooTweets:
             else:
                 self.reports = reports
         
-    def __get_yahoo_reports(self, old_time, sleep_time):
+    async def __get_yahoo_reports(self, old_time, sleep_time):
         """
         Yahoo! リアルタイム検索からデータを取得し、疑似Tweetを作成
         """
         global time #timeがローカル変数と認識されるので必要
         
-        URL=r"""https://search.yahoo.co.jp/realtime/"""
-        chrome_option = webdriver.ChromeOptions()
-    ##    chrome_option.add_argument('--headless')
-    ##    chrome_option.add_argument('--disable-gpu')
-        chrome_option.add_experimental_option('excludeSwitches', ['enable-logging'])
-        chrome_option.add_argument('--disable-features=NetworkService')
-        driver = webdriver.Chrome(options=chrome_option, service_args=["--silent"])
-
-        driver.get(URL)
-        time.sleep(sleep_time)
-
-        ### Yahoo!リアルタイム検索トップページから入らないと自動取得が働かない
-        elem = driver.find_element_by_name("p")
-        elem.clear()
-        elem.send_keys("#FGO周回カウンタ")
-        elem.send_keys(Keys.RETURN)
-
-        html01=driver.page_source
-        flag = False
         now = datetime.datetime.now()
         unix_now = int(time.mktime(now.timetuple()))
         unix_old = int(time.mktime(old_time.timetuple()))
         tmp_time = unix_now
 
         print("Yahoo!リアルタイム検索での周回報告をブラウザ上に展開中")
+        browser = await launch()
+        # browser = await launch()
+        page = await browser.newPage()
+        await page.goto('https://search.yahoo.co.jp/realtime/search?p=%23FGO%E5%91%A8%E5%9B%9E%E3%82%AB%E3%82%A6%E3%83%B3%E3%82%BF&ei=UTF-8&ifr=tp_sc')
+
+        # 自動更新(オートスクロール)をオフに
+        await page.click('label.Tab_on__2QQJQ')
         while 1:
-            pbar = tqdm(total=unix_now - unix_old)
-            while 1:
-            ##   all_time =  time.mktime((now - old_time).timetuple())
+            try:
+                await page.click('div .More_button__1w3gz')
+            except Exception as e:
+                await page.evaluate('window.scrollTo(0,document.body.scrollHeight)')
+            await asyncio.sleep(2)
 
-
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                item = driver.find_elements_by_css_selector(".cnt.cf:not(.TS2bh)")
-                get_time = int(item[-1].get_attribute("data-time"))
-                difftime = tmp_time - get_time
-                tmp_time = get_time
-                pbar.update(int(difftime))
-
-#                if(datetime.datetime.now() - datetime.datetime.fromtimestamp(int(item[-1].get_attribute("data-time")))).days >= 10:
-                if old_time > datetime.datetime.fromtimestamp(int(item[-1].get_attribute("data-time"))):
-                    #print("Twitter APIで取得したデータより古いデータを取得したので終了します")
-                    flag = True
-                    pbar.close()
-                    break
-                #print(str(sleep_time) + "秒待ちます")
-                time.sleep(sleep_time)
-                html02=driver.page_source
-                if html01!=html02: #サイズが違うとき
-                    html01=html02
-                    #print("新たなページの取得に成功しました")
-                    try:
-                        driver.find_element_by_link_text("もっと見る").click()
-                        get_time = int(item[-1].get_attribute("data-time"))
-                        difftime = tmp_time - get_time
-                        tmp_time = get_time
-                        pbar.update(int(difftime))
-                         #print("「もっと見る」ボタンを押しました")
-                    except selenium.common.exceptions.NoSuchElementException:
-                        continue
+            tweet_time = await page.querySelectorAll("time.Tweet_time__11Fxn")
+                
+            twt = await page.evaluate('(element) => element.textContent', tweet_time[-1])
+            pattern1 = r"(?P<month>[0-9]{1,2})月(?P<day>[0-9]{1,2})日\([日月火水木金土]\)"
+            pattern2 = r"(?P<hour>([0-9]|[01][0-9]|2[0-3])):(?P<min>[0-5][0-9])"
+            pattern = pattern1 + ' ' + pattern2
+            m1 = re.search(pattern, twt)
+            if m1:
+                # year のギミック
+                dt_now = dt.now()
+                str_m = r"\g<month>"
+                tweet_month = int(re.sub(pattern, str_m, m1.group()))
+                if tweet_month > dt_now.month:
+                    year = dt_now.year -1
                 else:
+                    year = dt_now.year
+                str_t = str(year) + r"/\g<month>/\g<day> \g<hour>:\g<min>"
+                tweet_time = re.sub(pattern, str_t, m1.group())
+                tweet_time_u = dt.strptime(tweet_time,"%Y/%m/%d %H:%M")
+                print(tweet_time_u)
+                print(old_time)
+                print(type(tweet_time_u))
+                print(type(old_time))
+                if tweet_time_u < old_time:
                     break
-            if flag == True:
-                break
-            print("「もっと見る」ボタンの表示待ちです")
-            wait = WebDriverWait(driver, 5) # 最大5秒
-            elem = wait.until( expected_conditions.element_to_be_clickable( (By.LINK_TEXT,"もっと見る")) )
-            elem.click()
-
-        pattern = "\n.+@(?P<name>.+)\n"
-        #for s in  driver.find_elements_by_css_selector(".cnt.cf:not(.TS2bh)"):
-        texts = driver.find_elements_by_css_selector(".cnt.cf")
-        names = driver.find_elements_by_css_selector(".refname")
-        screen_names = driver.find_elements_by_css_selector(".nam")
-
 
         print("ブラウザ上から周回データを取得中")
 
-        pbar = tqdm(total=len(texts))
         self.yahooreports = []
-        for text, name, screen_name in zip(texts, names, screen_names):
+        texts_raw = await page.querySelectorAll("p.Tweet_body__3JAGe")
+        screen_names_raw = await page.querySelectorAll("a.Tweet_authorID__29CrN")
+        for t, s in zip(texts_raw, screen_names_raw):
             status=TweetStatus()
-            time = datetime.datetime.fromtimestamp(int(text.get_attribute("data-time")))
-##            std_time = time - datetime.timedelta(hours=9)
-            screen_name = screen_name.text.replace("@", "")
-##            id = self.__get_id(screen_name, time)
-            
-            status.time = time
-##            status["user"] = {}
-            status.user.name = name
-            status.user.screen_name = screen_name
-##            status["id"] = int(id)
-##            status["id_str"] = id
-            status.text= text.text
-##            status["full_text"] = self.__get_tweet_text(id)
-            if time >= old_time:
-                self.yahooreports.append(status)
-            pbar.update(1)
-        pbar.close()
-        driver.close()
-        driver.quit()
+            text = await page.evaluate('(element) => element.textContent', t)
+            if text.startswith("RT @"):
+                continue
+            data_ylk = await page.evaluate('(element) => element.getAttribute("data-ylk")', s)
+            tmp1 = data_ylk.split(";")
+            items = {}
+            for tmp2 in tmp1:
+                tmp3 = tmp2.split(":")
+                items[tmp3[0]] = tmp3[1]
+            status.id  = int(items["twid"])
+            # スクロールでは10個単位でツイートをとってくるので
+            # if time >= old_time:
+            self.yahooreports.append(status)
 
     def __report2report(self, report):
         """
@@ -895,37 +865,19 @@ class YahooTweets:
         print("Yahoo!リアルタイム検索のデータをTwitter APIからのデータと比較中")
         pbar = tqdm(total=len(self.yahooreports))
         for yahoo_report in self.yahooreports:
-            yahoo_text = yahoo_report.text
-            if yahoo_text.startswith("RT @"):
-                pbar.update(1)
-                continue            
-            yahoo_screen_name = yahoo_report.user.screen_name
-            yahoo_time = yahoo_report.time
             #Twitter APIから取得した投稿に同じ時間の投稿があるか調査
             exists_flag = False
             for twitter_report in twitter_reports: #Twitterのデータと比較
-                twitter_time = twitter_report.time
-                twitter_screen_name = twitter_report.screen_name
-                if twitter_time == yahoo_time:
-                    #同じ時間(分)に連投された報告の場合この処理はうまくいかない
-                    if twitter_screen_name == yahoo_screen_name:
-                        exists_flag = True
-                        break
+                if twitter_report.id == yahoo_report.id:
+                    exists_flag = True
+                    break
             for h in history.keys(): #履歴と比較
-                history_time = history[h]["time"]
-                history_screen_name = history[h]["screen_name"]
-                if history_time == yahoo_time:
-                    #同じ時間(分)に連投された報告の場合この処理はうまくいかない
-                    if history_screen_name == yahoo_screen_name:
-                        exists_flag = True
-                        break
-                    # screen_name が変更になっているときtextで判断
-                    elif self.__report2report(yahoo_text) == self.__report2report(history[h]["text"]):
-                        exists_flag = True
-                        break
+                if history[h]["id"] == yahoo_report.id:
+                    exists_flag = True
+                    break
             if exists_flag == False: #同じ時間の投稿がないとき
                 try:
-                    status = self.__get_status(yahoo_report.user.screen_name, yahoo_report.time)
+                    status = self.__get_id(yahoo_report.id)
                     if status != None: # ツイ消し以外
                         yahoo_report = ReportTweet(status)
     ##                    yahoo_report.full_text = self.__get_tweet_text(yahoo_report.id)
@@ -952,7 +904,17 @@ class YahooTweets:
         self.reports = new_list
 
 
-##    def __get_id(self, user, tweet_time):
+    def __get_id(self, id):
+        """
+        ユーザー名と投稿時間からツイートstatusを取得する
+        """
+        # OAuth認証
+        api = tweepy.API(auth)
+        print(id)
+        status = api.get_status(id, tweet_mode="extended")
+        return status
+
+
     def __get_status(self, user, tweet_time):
         """
         ユーザー名と投稿時間からツイートstatusを取得する
@@ -1958,6 +1920,7 @@ def read_history(NG_NAME, NG_ID):
                 q = {}
                 for item in row:
                     q["time"] = datetime.datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S')
+                    q["id"] = int(row[1])
                     if row[2] == "":
                         q["reply"] = None
                     else:
@@ -2479,9 +2442,6 @@ if __name__ == '__main__':
         # 履歴をチェック・更新
         yahoo_reports = check_history(yahoo_reports, history, replies, favlist)            
 
-    except selenium.common.exceptions.TimeoutException:
-        print("[エラー] タイムアウトしました。WAIT 値が小さすぎる場合は、--wait でより大きな値を指定してください。")
-        sys.exit()
     except tweepy.error.RateLimitError:
         print("[エラー] Twitter APIの使用制限に達しました。15分待ってから再実行してください。")
         sys.exit()
