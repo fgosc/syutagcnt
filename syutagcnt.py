@@ -23,6 +23,7 @@ import argparse
 import datetime
 import asyncio
 from datetime import datetime as dt
+import logging
 
 from pyppeteer import launch
 # import selenium
@@ -37,6 +38,7 @@ import codecs
 
 progname = "FGO周回カウンタタグカウンタ"
 version = "0.9.16"
+logger = logging.getLogger(__name__)
 
 settingfile = os.path.join(os.path.dirname(__file__), 'setting.ini')
 
@@ -48,7 +50,7 @@ try:
     CONSUMER_KEY = config.get(section1, "CONSUMER_KEY")
     CONSUMER_SECRET = config.get(section1, "CONSUMER_SECRET")
 except configparser.NoSectionError:
-    print("[エラー] 設定ファイルに不備があります。setting.ini を見直してください。")
+    logger.error("[エラー] 設定ファイルに不備があります。setting.ini を見直してください。")
     sys.exit()
 
 
@@ -772,7 +774,7 @@ class YahooTweets:
         unix_old = int(time.mktime(old_time.timetuple()))
         tmp_time = unix_now
 
-        print("Yahoo!リアルタイム検索での周回報告をブラウザ上に展開中")
+        logger.info("Yahoo!リアルタイム検索での周回報告をブラウザ上に展開中")
         browser = await launch()
         # browser = await launch()
         page = await browser.newPage()
@@ -806,14 +808,10 @@ class YahooTweets:
                 str_t = str(year) + r"/\g<month>/\g<day> \g<hour>:\g<min>"
                 tweet_time = re.sub(pattern, str_t, m1.group())
                 tweet_time_u = dt.strptime(tweet_time,"%Y/%m/%d %H:%M")
-                print(tweet_time_u)
-                print(old_time)
-                print(type(tweet_time_u))
-                print(type(old_time))
                 if tweet_time_u < old_time:
                     break
 
-        print("ブラウザ上から周回データを取得中")
+        logger.info("ブラウザ上から周回データを取得中")
 
         self.yahooreports = []
         texts_raw = await page.querySelectorAll("p.Tweet_body__3JAGe")
@@ -862,7 +860,7 @@ class YahooTweets:
         yahoo_only = 0
         not_in_history = 0
         end_time =twitter_reports[-1].time
-        print("Yahoo!リアルタイム検索のデータをTwitter APIからのデータと比較中")
+        logger.info("Yahoo!リアルタイム検索のデータをTwitter APIからのデータと比較中")
         pbar = tqdm(total=len(self.yahooreports))
         for yahoo_report in self.yahooreports:
             #Twitter APIから取得した投稿に同じ時間の投稿があるか調査
@@ -891,9 +889,7 @@ class YahooTweets:
             pbar.update(1)
             i = i + 1
         pbar.close()
-        print("履歴に無いYahoo!のみのデータ: ", end ="")
-        print(yahoo_only, end = "件")
-        print()
+        logger.info("履歴に無いYahoo!のみのデータ: %d件", yahoo_only)
         
         self.unsearch_reports = new_reports        
              
@@ -910,7 +906,6 @@ class YahooTweets:
         """
         # OAuth認証
         api = tweepy.API(auth)
-        print(id)
         status = api.get_status(id, tweet_mode="extended")
         return status
 
@@ -1308,8 +1303,8 @@ class ExcelFile:
                 try:
                     time = id2time(resume_id)
                 except:
-                    print("[エラー]前回終了時に取得した最後のツイートが消去されたようです")
-                    print("setting.ini の resume_id を修正して再実行してください")
+                    logger.error("[エラー]前回終了時に取得した最後のツイートが消去されたようです")
+                    logger.error("setting.ini の resume_id を修正して再実行してください")
                     sys.exit()
         for story in story_list:
             ws = self.wb.get_worksheet_by_name("統計【" + story + "】")
@@ -1576,7 +1571,7 @@ def make_replies(reports, favlist):
     max_loop = 5
     replies = {}
 
-    print("投稿者のタイムラインを調査中")
+    logger.info("投稿者のタイムラインを調査中")
 
     with tqdm(total=len(reports)) as pbar:
 
@@ -1720,6 +1715,72 @@ def make_nofavreports(reports, favlist):
             new_reports.append(report)
     return new_reports
             
+def rebuild_tweets(unique_screen_names, since_id):
+    # OAuth認証
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+    auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
+    api = tweepy.API(auth)
+    logger.info("ユーザーのタイムラインから#FGO周回カウンタを検索中")
+    max_loop = 10
+    # screen_name で timeline を取得し、#FGO周回カウンタ の投稿のみを抽出する
+    reports = []
+    with tqdm(total=len(unique_screen_names)) as pbar:
+        for screen_name in unique_screen_names:
+            max_id = -1
+            status = None
+            flag = False
+            count = 0
+            for loop in range(max_loop):
+                # logger.info("since_id: %s", since_id)
+                # logger.info("max_id: %s", max_id)
+                try:
+                    if max_id == -1:
+                        statuses = api.user_timeline(screen_name=screen_name, tweet_mode="extended",
+                                                        count=200,
+                                                        since_id=since_id - 1,
+                                                        exclude_replies="false",
+                                                        include_rts="false")
+                        if len(statuses) == 0:
+                            break
+                        for status in statuses:
+                            count += 1
+                            if "#FGO周回カウンタ" in status.full_text:
+                                reports.append(ReportTweet(status))
+                            if status == None:
+                                flag = True
+                                break
+                    else:
+                        statuses = api.user_timeline(screen_name=screen_name, tweet_mode="extended",
+                                                        max_id=max_id - 1,
+                                                        count=200,
+                                                        since_id=since_id - 1,
+                                                        exclude_replies="false",
+                                                        include_rts="false")
+                        if len(statuses) == 0:
+                            break
+                        for status in statuses:
+                            count += 1
+                            if "#FGO周回カウンタ" in status.full_text:
+                                reports.append(ReportTweet(status))
+                            if status == None:
+                                flag = True
+                                break
+                except tweepy.error.TweepError as e:
+                    logger.warning(e)
+##                        print("\n[エラー]原因不明のTweepErrorです")
+##                        print(screen_name)
+##                        print(id)
+                    continue
+                if flag:
+                    break
+                if status != None:
+                    max_id=status.id
+                else:
+                    break
+            pbar.update(1)
+            logger.debug("screen_name:%s, count: %d", screen_name, count)
+    return reports
+
 def get_tweet(ACCESS_TOKEN, ACCESS_SECRET):
     """
     #FGO周回カウンタ ハッシュタグのツイートを取得する
@@ -1741,7 +1802,7 @@ def get_tweet(ACCESS_TOKEN, ACCESS_SECRET):
     nglist = NG_NAME.split()
     ngidlist = NG_ID.split()
     reports = []
-    print("Twitter API で周回データを検索中")
+    logger.info("Twitter API で周回データを検索中")
     with tqdm() as pbar:
         for loop in range(max_loop):
             for status in api.search(q='#FGO周回カウンタ',
@@ -1805,10 +1866,10 @@ def read_freequest():
                 q["report"] = []
                 freequest[row[3]] = q
         except UnicodeDecodeError:
-            print("[エラー]freequest.csv の文字コードがおかしいようです。UTF-8で保存してください。")
+            logger.error("[エラー]freequest.csv の文字コードがおかしいようです。UTF-8で保存してください。")
             sys.exit()
         except IndexError:
-            print("[エラー]freequest.csv がCSV形式でないようです。")
+            logger.error("[エラー]freequest.csv がCSV形式でないようです。")
             sys.exit()
                 
 
@@ -1837,10 +1898,10 @@ def read_syurenquest():
                 q["report"] = []
                 syurenquest[row[0]] = q
         except UnicodeDecodeError:
-            print("[エラー]syurenquest.csv の文字コードがおかしいようです。UTF-8で保存してください。")
+            logger.error("[エラー]syurenquest.csv の文字コードがおかしいようです。UTF-8で保存してください。")
             sys.exit()
         except IndexError:
-            print("[エラー]syurenquest.csv がCSV形式でないようです。")
+            logger.error("[エラー]syurenquest.csv がCSV形式でないようです。")
             sys.exit()
 
 def read_item():
@@ -1861,10 +1922,10 @@ def read_item():
                     sozai_betsumei[item] = row[1]
                 sozai[row[1]] = row[0]
         except UnicodeDecodeError:
-            print("[エラー]item.csv の文字コードがおかしいようです。UTF-8で保存してください。")
+            logger.error("[エラー]item.csv の文字コードがおかしいようです。UTF-8で保存してください。")
             sys.exit()
         except IndexError:
-            print("[エラー]item.csv がCSV形式でないようです。")
+            logger.error("[エラー]item.csv がCSV形式でないようです。")
             sys.exit()
 
 def read_quest():
@@ -1884,10 +1945,10 @@ def read_quest():
                         break
                     quest[name] = row[0]
         except UnicodeDecodeError:
-            print("[エラー]item.csv の文字コードがおかしいようです。UTF-8で保存してください。")
+            logger.error("[エラー]item.csv の文字コードがおかしいようです。UTF-8で保存してください。")
             sys.exit()
         except IndexError:
-            print("[エラー]item.csv がCSV形式でないようです。")
+            logger.error("[エラー]item.csv がCSV形式でないようです。")
             sys.exit()
                                                             
 def read_history(NG_NAME, NG_ID):
@@ -1898,7 +1959,7 @@ def read_history(NG_NAME, NG_ID):
     itemfile = os.path.join(os.path.dirname(__file__), 'history.csv')
 
     if os.path.exists(itemfile) == False:
-        print("history.csv ファイルを新規作成します")
+        logger.info("history.csv ファイルを新規作成します")
         return history
 
     ngnamelist = NG_NAME.split()
@@ -1909,7 +1970,7 @@ def read_history(NG_NAME, NG_ID):
             ngnamelist.append(userid2screen_name(ngid))
         except tweepy.error.TweepError as err:
             if "User has been suspended." in str(err):
-                print("setting.ini の ng_id に記述されている " + ngid + " はBANされました")
+                logger.info("setting.ini の ng_id に記述されている " + ngid + " はBANされました")
 
     with open(itemfile, 'r' , encoding="utf_8") as f:
         try:
@@ -1937,14 +1998,14 @@ def read_history(NG_NAME, NG_ID):
                 if row[4] not in ngnamelist and '#FGO販売' not in row[5]:
                     history[int(row[1])] = q
                 if row[1].isdigit() == False:
-                    print("[エラー] history.csv がおかしいようです。削除してください。")
+                    logger.error("[エラー] history.csv がおかしいようです。削除してください。")
                     sys.exit()
         except UnicodeDecodeError:
-            print("[エラー]history.csv の文字コードがおかしいようです。UTF-8で保存してください。")
+            logger.error("[エラー]history.csv の文字コードがおかしいようです。UTF-8で保存してください。")
             sys.exit()
         except (IndexError, ValueError) as err:
-            print("[エラー]history.csv が正しいCSV形式でないようです。")
-            print(err)
+            logger.error("[エラー]history.csv が正しいCSV形式でないようです。")
+            logger.error(err)
             sys.exit()
     return history
 
@@ -2021,7 +2082,7 @@ def make_history_replies(yahoo_reports, history, replies, favlist):
             id_history.append(key)
     id_history = set(id_history)
     
-    print("履歴のみに報告のある投稿者を調査中")
+    logger.info("履歴のみに報告のある投稿者を調査中")
     with tqdm(total=len(id_history - id_yahoos)) as pbar:
         for id in (id_history - id_yahoos):
             max_id = -1
@@ -2154,10 +2215,12 @@ def check_history(yahoo_reports, history, replies, favlist):
 
     return yahoo_reports
 
+
 def get_oauth_token(url:str)->str:
     querys = urllib.parse.urlparse(url).query
     querys_dict = urllib.parse.parse_qs(querys)
     return querys_dict["oauth_token"][0]
+
 
 def compare_twitter_history(reports, history):
     """
@@ -2191,11 +2254,9 @@ def compare_twitter_history(reports, history):
         # reports にあるid一覧を取得する
         tw_list.append(report.id)
         new_reports.append(report)
-    print("Twitterからの新規取得データ: ", end = "")
-    print(restore_count + new_count, end = "件")
+    logger.info("Twitterからの新規取得データ: %d件", restore_count + new_count)
     if restore_count > 0:
-        print("(うち既取得データ時間以前のもの: ", end = "")
-        print(restore_count, end = "件)")
+        logger.info("(うち既取得データ時間以前のもの: %d件)", restore_count)
 
     public_id = []
     deleted_id = []
@@ -2237,12 +2298,9 @@ def compare_twitter_history(reports, history):
                     new_reports.append(d)
                  
     if del_count > 0:
-        print(", 削除データ: ", end = "")
-        print(del_count, end = "件")
+        logger.info(", 削除データ: %d件", del_count)
     if public_count > 0:
-        print(", 鍵垢化データ: ", end = "")
-        print(public_count, end = "件")
-    print()
+        logger.info(", 鍵垢化データ: %d件", public_count)
 
     
     return new_reports, restore_id, deleted_id
@@ -2336,7 +2394,7 @@ if __name__ == '__main__':
             config.write(file)
 
     except configparser.NoSectionError:
-        print("[エラー] 設定ファイルに不備があります。setting.ini を消して再実行してください。")
+        logger.error("[エラー] 設定ファイルに不備があります。setting.ini を消して再実行してください。")
         sys.exit()
 
     parser = argparse.ArgumentParser(description='FGO周回カウンタの報告を集めExcel出力する')
@@ -2352,13 +2410,22 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--number', help='統計シートの報告にNoをつける', action='store_true')
     parser.add_argument('-w', '--wait', help='ブラウザ操作時の待ち時間(秒)を指定する(デフォルト2秒)', type=int, default=2)
     parser.add_argument('--version', action='version', version=progname + " " + version)
+    parser.add_argument('-l', '--loglevel',
+                        choices=('debug', 'info'), default='info')
+
 
     args = parser.parse_args()    # 4. 引数を解析
+    lformat = '[%(levelname)s] %(message)s'
+    logging.basicConfig(
+        level=logging.INFO,
+        format=lformat,
+    )
+    logger.setLevel(args.loglevel.upper())
     if args.url != None: #https://twitter.com/ /status/1146270030495133697
         #パターンチェック
         tweet_pattern = "https://twitter.com/.+?/status/"
         if not re.match(tweet_pattern , args.url):
-            print("[エラー] URLがTwitterのものではありません")
+            logger.error("[エラー] URLがTwitterのものではありません")
             sys.exit()
         resume_id = int(re.sub(tweet_pattern, "", args.url))
 ##        use_resume = True
@@ -2380,7 +2447,7 @@ if __name__ == '__main__':
         use_yahoo = True
 
     if args.wait < 1:
-        print("[エラー] WAITの値は1以上でないといけません")
+        logger.error("[エラー] WAITの値は1以上でないといけません")
         sys.exit()
 
     # Excelファイルチェック
@@ -2389,7 +2456,7 @@ if __name__ == '__main__':
         f = ExcelFile(args.filename)            
         f.close()
     except PermissionError:        
-        print("[エラー] Excelファイルに書き込めません。Excelで開いている場合は閉じるかファイル名を変更してください。")
+        logger.error("[エラー] Excelファイルに書き込めません。Excelで開いている場合は閉じるかファイル名を変更してください。")
         sys.exit()
     
     auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
@@ -2399,7 +2466,7 @@ if __name__ == '__main__':
     for csvfile in csvfiles:
         target_path = os.path.join(os.path.dirname(__file__), csvfile)
         if os.path.isfile(target_path) == False:
-            print("[エラー] " + csvfile + " が見つかりません。 "+ os.path.dirname(__file__) +" に入れてください。")
+            logger.error("[エラー] %s が見つかりません。 %s に入れてください。", csvfile, os.path.dirname(__file__))
             sys.exit()
     #各データCSVを読み込む
     read_item()
@@ -2422,6 +2489,14 @@ if __name__ == '__main__':
 ##    yahoo_reports = get_yahoo_reports()
         yt = YahooTweets(reports, history, since_id, args.wait, use_yahoo)
         yahoo_reports = yt.reports
+        # ユニークユーザーを出す
+        unique_screen_names = set([report.screen_name for report in yahoo_reports])
+        logger.info("投稿したユニークユーザの数: %d", len(unique_screen_names))
+        # ユニークユーザーで検索をかけてデータを再構築
+        logger.debug("ユニークユーザーで検索をかけてデータを再構築開始")
+        yahoo_reports = rebuild_tweets(unique_screen_names, since_id)
+        logger.debug("ユニークユーザーで検索をかけてデータを再構築終了")
+
 ##        check_reports(yahoo_reports)
         #いいねしたツイートの処理
         favlist = []
@@ -2440,10 +2515,12 @@ if __name__ == '__main__':
             yahoo_reports = add_reply_info(yahoo_reports, replies)
 
         # 履歴をチェック・更新
+        logger.debug("履歴をチェック・更新開始")
         yahoo_reports = check_history(yahoo_reports, history, replies, favlist)            
+        logger.debug("履歴をチェック・更新終了")
 
     except tweepy.error.RateLimitError:
-        print("[エラー] Twitter APIの使用制限に達しました。15分待ってから再実行してください。")
+        logger.error("[エラー] Twitter APIの使用制限に達しました。15分待ってから再実行してください。")
         sys.exit()
 
 
@@ -2457,6 +2534,7 @@ if __name__ == '__main__':
 ##        yahoo_reports = make_nofavreports(yahoo_reports, favlist)
 
     #Excelファイルを生成
+    logger.debug("Excelファイルを生成")
     try:
         if use_yahoo == True:
             f = NoserchExcelFile(args.filename)
