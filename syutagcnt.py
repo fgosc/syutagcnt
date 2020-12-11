@@ -860,7 +860,7 @@ class YahooTweets:
         yahoo_only = 0
         not_in_history = 0
         end_time =twitter_reports[-1].time
-        logger.infopr("Yahoo!リアルタイム検索のデータをTwitter APIからのデータと比較中")
+        logger.info("Yahoo!リアルタイム検索のデータをTwitter APIからのデータと比較中")
         pbar = tqdm(total=len(self.yahooreports))
         for yahoo_report in self.yahooreports:
             #Twitter APIから取得した投稿に同じ時間の投稿があるか調査
@@ -2415,7 +2415,7 @@ if __name__ == '__main__':
 
 
     args = parser.parse_args()    # 4. 引数を解析
-    lformat = '%(name)s <%(filename)s-L%(lineno)s> [%(levelname)s] %(message)s'
+    lformat = '[%(levelname)s] %(message)s'
     logging.basicConfig(
         level=logging.INFO,
         format=lformat,
@@ -2491,7 +2491,7 @@ if __name__ == '__main__':
         yahoo_reports = yt.reports
         # ユニークユーザーを出す
         unique_screen_names = set([report.screen_name for report in yahoo_reports])
-        logger.info("len(unique_screen_names): %d", len(unique_screen_names))
+        logger.info("投稿したユニークユーザの数: %d", len(unique_screen_names))
         # ユニークユーザーで検索をかけてデータを再構築
         logger.debug("ユニークユーザーで検索をかけてデータを再構築開始")
         yahoo_reports = rebuild_tweets(unique_screen_names, since_id)
