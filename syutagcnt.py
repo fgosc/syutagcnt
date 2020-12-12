@@ -255,7 +255,7 @@ class SyukaiReport:
     """
     #FGO周回カウンタ でリポートされた周回を収めるクラス
     """
-    def __init__(self, report):
+    def __init__(self, report, stats=False):
         """
         
         """
@@ -266,9 +266,9 @@ class SyukaiReport:
 ##        self.name = status.user.name
 ##        self.screen_name = status.user.screen_name
                         
-        self.make_data(report)
+        self.make_data(report, stats)
 
-    def make_data(self, report):
+    def make_data(self, report, stats=False):
         self.category = None
         if "ツイ消し" in self.memo:
             self.category = "Error"
@@ -335,7 +335,7 @@ class SyukaiReport:
 
         #周回場所 標準化
         place = re.sub(pattern, r"\g<place>", m.group())
-        self.__normalize_place(place)
+        self.__normalize_place(place, stats)
 ##        self.place = place
 
 ##        if self.items == {}:
@@ -368,12 +368,12 @@ class SyukaiReport:
             if len(item) == 0: #空行は無視
                 continue
             if item.endswith("NaN"):
-                if item.replace("NaN", "") in self.items.keys():
-                    if self.items[item.replace("NaN", "")] != "NaN":
-                        self.category = "Error"
-                        self.items = {}
-                        break                 
-                self.items[item.replace("NaN", "")] = "NaN"
+                # if item.replace("NaN", "") in self.items.keys():
+                #     if self.items[item.replace("NaN", "")] != "NaN":
+                #         self.category = "Error"
+                #         self.items = {}
+                #         break                 
+                # self.items[item.replace("NaN", "")] = "NaN"
                 continue
             if item.endswith("?"):
                 self.category = "Error"
@@ -415,6 +415,16 @@ class SyukaiReport:
                 tmpitem2 = tmpitem2.replace("万", "0000")
                 tmpitem = tmpitem1 + tmpitem2                
             
+            # 集計しない種火は無視する
+            out_flag = False
+            outlist = ["種火", "灯火", "大火"]
+            for out in outlist:
+                if out in tmpitem:
+                    out_flag = True
+                    break
+            if out_flag:
+                continue
+
             #業火は例外にする
             if noclass == True:
                 exlist = []
@@ -464,7 +474,7 @@ class SyukaiReport:
             self.items = {}
             self.category = "Error"
             
-    def __normalize_place(self, place):
+    def __normalize_place(self, place, stats=False):
         if self.category == "Error":
             self.place = place
             return
@@ -520,7 +530,8 @@ class SyukaiReport:
                 self.category = "フリクエ1.5部"
             else: #フリクエ2部
                 self.category = "フリクエ2部"
-            self.__make_freequest_data(place2)
+            if stats:
+                self.__make_freequest_data(place2)
         elif place in syurenquest.keys(): #修練クエストとして認識
             #アイテムチェック
             if self.__validitem(self.items.keys(), syurenquest[place]["ドロップアイテム"].keys()) == False:
@@ -533,7 +544,8 @@ class SyukaiReport:
                 self.memo.append("ドロップ率異常")
                 return
             self.category = "修練場"
-            self.__make_syurenquest_data()
+            if stats:
+                self.__make_syurenquest_data()
         else:
             check = 0
             for p in freequest.keys():
@@ -556,7 +568,8 @@ class SyukaiReport:
                     else:
                         self.category = "フリクエ2部"
                     check = 1
-                    self.__make_freequest_data(p)
+                    if stats:
+                        self.__make_freequest_data(p)
                     break
             if check == 0:
                 self.category = "その他クエスト"
@@ -568,22 +581,26 @@ class SyukaiReport:
 
         tmpset = set(fqkey)
         tmpset.add("銀種火")
-        tmpset.add("剣大火")
-        tmpset.add("弓大火")
-        tmpset.add("槍大火")
-        tmpset.add("騎大火")
-        tmpset.add("術大火")
-        tmpset.add("殺大火")
-        tmpset.add("狂大火")
-        tmpset.add("剣灯火")
-        tmpset.add("弓灯火")
-        tmpset.add("槍灯火")
-        tmpset.add("騎灯火")
-        tmpset.add("術灯火")
-        tmpset.add("殺灯火")
-        tmpset.add("狂灯火")
-        
-        if len(set(reportkey) -tmpset) > 0:
+        # tmpset.add("剣大火")
+        # tmpset.add("弓大火")
+        # tmpset.add("槍大火")
+        # tmpset.add("騎大火")
+        # tmpset.add("術大火")
+        # tmpset.add("殺大火")
+        # tmpset.add("狂大火")
+        # tmpset.add("剣灯火")
+        # tmpset.add("弓灯火")
+        # tmpset.add("槍灯火")
+        # tmpset.add("騎灯火")
+        # tmpset.add("術灯火")
+        # tmpset.add("殺灯火")
+        # tmpset.add("狂灯火")
+        new_reportkey = []
+        for report in reportkey:
+            if not report.startswith("QP"):
+                new_reportkey.append(report)
+    
+        if len(set(new_reportkey) -tmpset) > 0:
             return False
 
         return True
@@ -700,7 +717,7 @@ class ReportTweet(SyukaiReport):
     """
     Twitterから直接取得したものを扱う
     """
-    def __init__(self,status):
+    def __init__(self,status, stats=False):
         """
         
         """
@@ -712,7 +729,7 @@ class ReportTweet(SyukaiReport):
         self.reply_count = None
         self.correction = False
         self.full_text = status.full_text
-        super().__init__(status.full_text)    
+        super().__init__(status.full_text, stats)    
 
 class DeletedTweet(ReportTweet):
     """
@@ -1745,7 +1762,7 @@ def rebuild_tweets(unique_screen_names, since_id):
                         for status in statuses:
                             count += 1
                             if "#FGO周回カウンタ" in status.full_text:
-                                reports.append(ReportTweet(status))
+                                reports.append(ReportTweet(status, stats=True))
                             if status == None:
                                 flag = True
                                 break
@@ -1761,7 +1778,7 @@ def rebuild_tweets(unique_screen_names, since_id):
                         for status in statuses:
                             count += 1
                             if "#FGO周回カウンタ" in status.full_text:
-                                reports.append(ReportTweet(status))
+                                reports.append(ReportTweet(status, stats=True))
                             if status == None:
                                 flag = True
                                 break
@@ -2516,7 +2533,7 @@ if __name__ == '__main__':
 
         # 履歴をチェック・更新
         logger.debug("履歴をチェック・更新開始")
-        yahoo_reports = check_history(yahoo_reports, history, replies, favlist)            
+        yahoo_reports = check_history(yahoo_reports, history, replies, favlist)
         logger.debug("履歴をチェック・更新終了")
 
     except tweepy.error.RateLimitError:
