@@ -1701,7 +1701,7 @@ def get_favlist(ACCESS_TOKEN, ACCESS_SECRET, since_id):
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
     api = tweepy.API(auth)
-    max_loop = 2
+    max_loop = 6
 ##    resume_id = last_id
     status = None
     max_id = -1
