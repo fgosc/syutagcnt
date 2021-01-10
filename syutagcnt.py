@@ -486,9 +486,10 @@ class SyukaiReport:
         if place.startswith("【") and place.endswith("】"):
             place = place[1:-1]
 
+        place = place.replace("(","（").replace(")", "）")
         if place in quest.keys():
             place = re.sub("^" + place + "$", quest[place], place)
-        self.place = place.replace("(","（").replace(")", "）")
+        self.place = place
             
         tmpplace = place.replace('(', ' ')
         tmpplace = tmpplace.replace(')', ' ')
