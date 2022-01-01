@@ -540,10 +540,10 @@ class SyukaiReport:
                 self.memo.append("非存在アイテム")
                 return
             #ドロップ率チェック
-            if self.__dropcheck(self.num, self.items)  == False:
-                self.category = "Error"
-                self.memo.append("ドロップ率異常")
-                return
+            # if self.__dropcheck(self.num, self.items)  == False:
+            #     self.category = "Error"
+            #     self.memo.append("ドロップ率異常")
+            #     return
             self.category = "修練場"
             if stats:
                 self.__make_syurenquest_data()
