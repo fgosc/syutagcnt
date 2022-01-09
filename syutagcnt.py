@@ -42,20 +42,9 @@ logger = logging.getLogger(__name__)
 
 settingfile = os.path.join(os.path.dirname(__file__), 'setting.ini')
 
-#keyの取得
-config = configparser.ConfigParser()
-try:
-    config.read(settingfile)
-    section1 = "auth_info"
-    CONSUMER_KEY = config.get(section1, "CONSUMER_KEY")
-    CONSUMER_SECRET = config.get(section1, "CONSUMER_SECRET")
-except configparser.NoSectionError:
-    logger.error("[エラー] 設定ファイルに不備があります。setting.ini を見直してください。")
-    sys.exit()
 
 
 #OAuthHandlerクラスのインスタンスを作成
-auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
 #auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
 
 MAXSERCH = 100 #一回の検索でサーチするツイート数(最大100)
@@ -2355,15 +2344,17 @@ def create_access_key_secret():
     print("access token key:",auth.access_token)
     print("access token secret:",auth.access_token_secret)
 
-    config = configparser.ConfigParser()
-    section1 = "auth_info"
-    config.add_section(section1)
+    # config = configparser.ConfigParser()
+    # section1 = "auth_info"
+    # config.add_section(section1)
     config.set(section1, "ACCESS_TOKEN", auth.access_token)
     config.set(section1, "ACCESS_SECRET", auth.access_token_secret)
 
-    settingfile = os.path.join(os.path.dirname(__file__), 'setting.ini')
+    # settingfile = os.path.join(os.path.dirname(__file__), 'setting.ini')
+    # logger.info(settingfile)
     with open(settingfile, "w") as file:
         config.write(file)
+        logger.info("write done.")
 
 
     print("Twitterのアプリ認証は正常に終了しました。")
@@ -2383,14 +2374,27 @@ if __name__ == '__main__':
     use_yahoo = False
 
     if os.path.exists(settingfile) == False:
-        create_access_key_secret()
-##        print("設定ファイルがありません。syutagcnt.py を実行してください。")
+        logger.error("設定ファイルがありません。setting-dst.ini をコピーしてください。")
         sys.exit()
 
+    #keyの取得
     config = configparser.ConfigParser()
-
     try:
         config.read(settingfile)
+        section1 = "auth_info"
+        CONSUMER_KEY = config.get(section1, "CONSUMER_KEY")
+        CONSUMER_SECRET = config.get(section1, "CONSUMER_SECRET")
+        ACCESS_TOKEN = config.get(section1, "ACCESS_TOKEN")
+        ACCESS_SECRET = config.get(section1, "ACCESS_SECRET")
+        if ACCESS_TOKEN == "" or ACCESS_SECRET == "":
+            create_access_key_secret()
+            sys.exit(0)
+    except configparser.NoSectionError:
+        logger.error("[エラー] 設定ファイルに不備があります。setting.ini を見直してください。")
+        sys.exit()
+
+    try:
+        # config.read(settingfile)
         section0 = "search"
         section1 = "auth_info"
         ACCESS_TOKEN = config.get(section1, "ACCESS_TOKEN")
@@ -2414,6 +2418,7 @@ if __name__ == '__main__':
     except configparser.NoSectionError:
         logger.error("[エラー] 設定ファイルに不備があります。setting.ini を消して再実行してください。")
         sys.exit()
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
 
     parser = argparse.ArgumentParser(description='FGO周回カウンタの報告を集めExcel出力する')
     # 3. parser.add_argumentで受け取る引数を追加していく
@@ -2429,7 +2434,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--wait', help='ブラウザ操作時の待ち時間(秒)を指定する(デフォルト2秒)', type=int, default=2)
     parser.add_argument('--version', action='version', version=progname + " " + version)
     parser.add_argument('-l', '--loglevel',
-                        choices=('debug', 'info'), default='info')
+                        choices=('debug', 'info', 'error', 'fatal'), default='fatal')
 
 
     args = parser.parse_args()    # 4. 引数を解析
@@ -2578,5 +2583,3 @@ if __name__ == '__main__':
     config.set(section0, "last_time", str(last_time))
     with open(settingfile, "w") as file:
         config.write(file)
-
-

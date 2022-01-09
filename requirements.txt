@@ -1,4 +1,4 @@
-pyppeteer
-tweepy
+pyppeteer==0.2.6
+tweepy==3.10.0
 tqdm
 XlsxWriter
