@@ -331,7 +331,7 @@ class SyukaiReport:
        
         #アイテム記述部分
         items = re.sub(pattern, r"\g<items>", m.group())
-        self.__make_itemdic(items)
+        self.__make_itemdic(items, report)
 
         #周回場所 標準化
         place = re.sub(pattern, r"\g<place>", m.group())
@@ -341,7 +341,7 @@ class SyukaiReport:
 ##        if self.items == {}:
 ##            self.category = "Error"
         
-    def __make_itemdic(self, s):
+    def __make_itemdic(self, s, report):
         """
         入力テキストからドロップアイテムとその数を抽出
         辞書に保存
@@ -464,8 +464,23 @@ class SyukaiReport:
                         self.category = "Error"
                         self.items = {}
                         self.memo.append("同名アイテムの重複")
-                        continue                        
-                self.items[tmpitem] = num
+                        continue
+                # 泥UP n % アイテム判定 アイテムにつくカッコは除外する
+                tmpitem2 =re.sub("\([^\(\)]*\)$", "", tmpitem.strip()).strip()
+                pattern_drop_up = f"{tmpitem2}泥UP(?P<num>[\s\S]+?)%"
+                report = unicodedata.normalize("NFKC", report)
+                m = re.search(pattern_drop_up, report)
+                if m:
+                    drop_up_rate = re.sub(pattern_drop_up, r"\g<num>", m.group()).strip()
+                    if drop_up_rate.isdigit():
+                        if int(drop_up_rate) == 0:
+                            self.items[tmpitem] = num
+                        else:
+                            self.items[tmpitem] = "NaN"
+                    else:
+                        self.items[tmpitem] = num
+                else:
+                    self.items[tmpitem] = num
         #アイテム数0のとき
         if self.category != "Error" and len(self.items.keys()) == 0:
             self.category = "Error"
