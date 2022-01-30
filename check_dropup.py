@@ -2,6 +2,7 @@ import csv
 import logging
 import argparse
 import re
+import os
 import unicodedata
 
 logger = logging.getLogger(__name__)
@@ -9,7 +10,8 @@ logger = logging.getLogger(__name__)
 
 def main(args):
     drop_up_retes = [0, 5, 10]  # 今後礼装の枚数が増えてきたらここを修正すればok
-    csv_file = open("./history.csv", "r", encoding="utf-8", newline="")
+    history_file = os.path.join(os.path.dirname(__file__), "history.csv")
+    csv_file = open(history_file, "r", encoding="utf-8", newline="")
     f = csv.DictReader(csv_file)
     results = []
     for row in f:
