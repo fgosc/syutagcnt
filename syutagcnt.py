@@ -455,7 +455,10 @@ class SyukaiReport:
                         self.memo.append("同名アイテムの重複")
                         continue
                 # 泥UP n % アイテム判定 アイテムにつくカッコは除外する
-                tmpitem2 =re.sub("\([^\(\)]*\)$", "", tmpitem.strip()).strip()
+                tmpitem2 = re.sub("\([^\(\)]*\)$", "", tmpitem.strip()).strip()
+                # 誤入入力された対応してない括弧も取り除く
+                tmpitem2 = tmpitem2.replace("(","")
+                tmpitem2 = tmpitem2.replace(")","")
                 pattern_drop_up = f"{tmpitem2}泥UP(?P<num>[\s\S]+?)%"
                 report = unicodedata.normalize("NFKC", report)
                 m = re.search(pattern_drop_up, report)
