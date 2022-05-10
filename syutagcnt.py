@@ -456,6 +456,8 @@ class SyukaiReport:
                         continue
                 # 泥UP n % アイテム判定 アイテムにつくカッコは除外する
                 tmpitem2 = re.sub("\([^\(\)]*\)$", "", tmpitem.strip()).strip()
+                if tmpitem2.startswith("+"):
+                    continue
                 # 誤入入力された対応してない括弧も取り除く
                 tmpitem2 = tmpitem2.replace("(","")
                 tmpitem2 = tmpitem2.replace(")","")
