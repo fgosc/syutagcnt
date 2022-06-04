@@ -427,7 +427,8 @@ class SyukaiReport:
                     error_flag = True
                     self.memo.append("クラス指定無しアイテム")
                     continue
-            exlist2 = ["剣", "弓", "槍", "騎", "術", "殺", "狂"]
+            exlist2 = ["弓", "槍", "騎", "術", "殺", "狂"]
+            # 剣は黄昏の儀式剣があるので除外
             for ex in exlist2:
                 if ex == tmpitem:
                     error_flag = True
